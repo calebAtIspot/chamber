@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -149,7 +150,7 @@ func validateKey(key string) error {
 	return nil
 }
 
-func getSecretStore() (store.Store, error) {
+func getSecretStore(ctx context.Context) (store.Store, error) {
 	rootPflags := RootCmd.PersistentFlags()
 	if backendEnvVarValue := os.Getenv(BackendEnvVar); !rootPflags.Changed("backend") && backendEnvVarValue != "" {
 		backend = backendEnvVarValue
@@ -186,7 +187,7 @@ func getSecretStore() (store.Store, error) {
 		if bucket == "" {
 			return nil, errors.New("Must set bucket for s3 backend")
 		}
-		s, err = store.NewS3StoreWithBucket(numRetries, bucket)
+		s, err = store.NewS3StoreWithBucket(ctx, numRetries, bucket)
 	case S3KMSBackend:
 		var bucket string
 		if bucketEnvVarValue := os.Getenv(BucketEnvVar); !rootPflags.Changed("backend-s3-bucket") && bucketEnvVarValue != "" {
@@ -213,9 +214,9 @@ func getSecretStore() (store.Store, error) {
 			return nil, errors.New("Must set kmsKeyAlias for S3 KMS backend")
 		}
 
-		s, err = store.NewS3KMSStore(numRetries, bucket, kmsKeyAlias)
+		s, err = store.NewS3KMSStore(ctx, numRetries, bucket, kmsKeyAlias)
 	case SecretsManagerBackend:
-		s, err = store.NewSecretsManagerStore(numRetries)
+		s, err = store.NewSecretsManagerStore(ctx, numRetries)
 	case SSMBackend:
 		if kmsKeyAliasFlag != DefaultKMSKey {
 			return nil, errors.New("Unable to use --kms-key-alias with this backend. Use CHAMBER_KMS_KEY_ALIAS instead.")
@@ -225,7 +226,7 @@ func getSecretStore() (store.Store, error) {
 		if err != nil {
 			return nil, fmt.Errorf("Invalid retry mode %s", retryMode)
 		}
-		s, err = store.NewSSMStoreWithRetryMode(numRetries, parsedRetryMode)
+		s, err = store.NewSSMStoreWithRetryMode(ctx, numRetries, parsedRetryMode)
 	default:
 		return nil, fmt.Errorf("invalid backend `%s`", backend)
 	}
